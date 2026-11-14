@@ -355,6 +355,13 @@ function ExamSessionContent() {
     const file = e.target.files?.[0];
     if (!file || !currentQuestion) return;
 
+    // Batasi upload foto lembar jawaban maksimal 2 MB (mencegah error Vercel 413 & hemat bandwidth)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Ukuran file maksimal 2 MB. Silakan kompres atau perkecil foto lembar jawaban Anda.");
+      e.target.value = "";
+      return;
+    }
+
     try {
       setUploadingFile(true);
       const formData = new FormData();

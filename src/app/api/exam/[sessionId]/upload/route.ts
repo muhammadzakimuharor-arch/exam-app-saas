@@ -56,10 +56,10 @@ export async function POST(
       );
     }
 
-    // Validasi ukuran (maks 10MB)
-    if (file.size > 10 * 1024 * 1024) {
+    // Validasi ukuran (maks 2MB untuk mencegah Vercel Serverless 413 Payload Too Large)
+    if (file.size > 2 * 1024 * 1024) {
       return NextResponse.json(
-        { error: 'Ukuran file melebihi batas maksimal 10MB' },
+        { error: 'Ukuran file maksimal 2 MB. Silakan kompres atau perkecil foto lembar jawaban Anda.' },
         { status: 400 }
       );
     }

@@ -10,6 +10,23 @@ export async function requireAdmin() {
   return { error: null, session };
 }
 
+export async function requireSuperAdmin() {
+  const { error, session } = await requireAdmin();
+  if (error || !session) return { error, session: null };
+
+  if (session.user.role !== 'superadmin') {
+    return {
+      error: NextResponse.json(
+        { error: 'Forbidden: Tindakan ini hanya dapat dilakukan oleh Super Admin' },
+        { status: 403 }
+      ),
+      session: null,
+    };
+  }
+
+  return { error: null, session };
+}
+
 export function successResponse(data: any, status = 200) {
   return NextResponse.json(data, { status });
 }

@@ -16,6 +16,10 @@ import {
   Download,
   ArrowRight,
   User,
+  ChevronDown,
+  BookOpen,
+  FolderOpen,
+  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
@@ -52,6 +56,7 @@ function ExamRegisterContent() {
   const [disallowReason, setDisallowReason] = useState<string | null>(null);
   const [availableExams, setAvailableExams] = useState<AvailableExam[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<string>("");
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [startingSession, setStartingSession] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
 
@@ -112,11 +117,24 @@ function ExamRegisterContent() {
       }
 
       setIsAllowed(true);
-      setAvailableExams(data.availableExams || []);
+      const rawExams: AvailableExam[] = data.availableExams || [];
+      setAvailableExams(rawExams);
 
-      if (data.availableExams && data.availableExams.length > 0) {
-        // Auto select first available exam
-        setSelectedExamId(data.availableExams[0].examId);
+      // Inisialisasi status buka/tutup accordion
+      const initialOpen: Record<string, boolean> = {};
+      rawExams.forEach((exam) => {
+        const groupKey = `${exam.classId}__${exam.subjectName}`;
+        if (initialOpen[groupKey] === undefined) {
+          // Buka grup secara default agar tugas langsung terlihat
+          initialOpen[groupKey] = true;
+        }
+      });
+      setOpenGroups(initialOpen);
+
+      if (rawExams.length > 0) {
+        // Otomatis pilih tugas pertama yang belum selesai (atau tugas pertama)
+        const firstUnfinished = rawExams.find((e) => e.status !== "selesai");
+        setSelectedExamId(firstUnfinished ? firstUnfinished.examId : rawExams[0].examId);
       }
 
       toast.success(`Data mahasiswa ditemukan: ${data.studentName}`);
@@ -128,6 +146,51 @@ function ExamRegisterContent() {
   };
 
   const selectedExam = availableExams.find((e) => e.examId === selectedExamId);
+
+  const toggleGroup = (key: string) => {
+    setOpenGroups((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  // Grouping daftar tugas berdasarkan Mata Kuliah & Kelas
+  const groupedExams = availableExams.reduce((acc, exam) => {
+    const key = `${exam.classId}__${exam.subjectName}`;
+    if (!acc[key]) {
+      acc[key] = {
+        groupKey: key,
+        subjectName: exam.subjectName,
+        className: exam.className,
+        classId: exam.classId,
+        subjectLevel: exam.subjectLevel,
+        exams: [],
+        totalCount: 0,
+        activeCount: 0,
+        completedCount: 0,
+      };
+    }
+    acc[key].exams.push(exam);
+    acc[key].totalCount++;
+    if (exam.status === "selesai") {
+      acc[key].completedCount++;
+    } else {
+      acc[key].activeCount++;
+    }
+    return acc;
+  }, {} as Record<string, {
+    groupKey: string;
+    subjectName: string;
+    className: string;
+    classId: string;
+    subjectLevel: string | null;
+    exams: AvailableExam[];
+    totalCount: number;
+    activeCount: number;
+    completedCount: number;
+  }>);
+
+  const groupsList = Object.values(groupedExams);
 
   // Start exam session
   const handleStartExam = async () => {
@@ -438,11 +501,18 @@ function ExamRegisterContent() {
                   </span>
                 </div>
 
-                {/* Exams List */}
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Pilih Penugasan / Ujian yang Akan Dikerjakan:
-                  </label>
+                {/* Exams List Grouped by Subject & Class in Dropdown / Accordion Cards */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Daftar Penugasan per Mata Kuliah & Kelas:
+                    </label>
+                    {groupsList.length > 0 && (
+                      <span className="text-[11px] text-slate-500 font-medium">
+                        {groupsList.length} Mata Kuliah Terdaftar
+                      </span>
+                    )}
+                  </div>
 
                   {availableExams.length === 0 ? (
                     <div className="p-3.5 rounded-lg bg-white border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
@@ -450,72 +520,153 @@ function ExamRegisterContent() {
                       <span>Belum ada penugasan atau ujian yang berstatus aktif di kelas Anda.</span>
                     </div>
                   ) : (
-                    <div className="space-y-2.5">
-                      {availableExams.map((exam) => {
-                        const isSelected = exam.examId === selectedExamId;
+                    <div className="space-y-3">
+                      {groupsList.map((group) => {
+                        const isOpen = openGroups[group.groupKey] ?? true;
+
                         return (
                           <div
-                            key={exam.examId}
-                            onClick={() => setSelectedExamId(exam.examId)}
-                            className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-                              isSelected
-                                ? "bg-white border-emerald-600 shadow-sm ring-1 ring-emerald-600"
-                                : "bg-white/80 border-slate-200 hover:bg-white"
-                            }`}
+                            key={group.groupKey}
+                            className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden transition-all"
                           >
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                                  <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase tracking-wide">
-                                    {exam.subjectName}
-                                  </span>
-                                  {exam.status === "selesai" && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">
-                                      Sudah Selesai
-                                    </span>
-                                  )}
-                                  {exam.status === "sedang_mengerjakan" && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                                      Sedang Berjalan
-                                    </span>
-                                  )}
-                                  {exam.scheduleState === "upcoming" && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
-                                      🕒 Belum Dibuka
-                                    </span>
-                                  )}
-                                  {exam.scheduleState === "ended" && exam.status !== "selesai" && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300">
-                                      Ditutup
-                                    </span>
-                                  )}
-                                  {exam.scheduleState === "open" && exam.startTime && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
-                                      🟢 Sedang Aktif
-                                    </span>
-                                  )}
+                            {/* Card Header (Accordion Toggle) */}
+                            <button
+                              type="button"
+                              onClick={() => toggleGroup(group.groupKey)}
+                              className="w-full flex items-center justify-between p-3.5 sm:p-4 hover:bg-slate-50/80 transition-colors text-left cursor-pointer"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                                  <BookOpen className="w-4 h-4" />
                                 </div>
-                                <span className="text-xs font-bold text-slate-900 block">
-                                  {exam.examTitle}
-                                </span>
-                                <p className="text-[11px] text-slate-500 mt-0.5">
-                                  Kelas {exam.className} &bull; {exam.totalQuestions} Soal
-                                </p>
-                                {exam.scheduleMessage && (
-                                  <p className={`text-[10px] mt-1 font-medium ${
-                                    exam.scheduleState === "upcoming" ? "text-amber-700" : exam.scheduleState === "ended" ? "text-slate-500" : "text-emerald-700"
-                                  }`}>
-                                    {exam.scheduleMessage}
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                                      {group.subjectName}
+                                    </h4>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                      Kelas {group.className}
+                                    </span>
+                                    {group.subjectLevel && (
+                                      <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">
+                                        ({group.subjectLevel})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-slate-500 mt-0.5">
+                                    {group.totalCount} Tugas &bull; {group.completedCount} Selesai &bull; {group.activeCount} Belum Selesai
                                   </p>
-                                )}
+                                </div>
                               </div>
 
-                              <div className="text-right text-[11px] text-slate-500 whitespace-nowrap">
-                                <span className="font-semibold text-slate-700">
-                                  {exam.durationMinutes} Menit
+                              <div className="flex items-center gap-2.5 shrink-0 ml-2">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  group.activeCount > 0
+                                    ? "bg-emerald-50 text-emerald-800 border border-emerald-300"
+                                    : "bg-slate-100 text-slate-600 border border-slate-200"
+                                }`}>
+                                  {group.totalCount} Tugas
                                 </span>
+                                <ChevronDown
+                                  className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                                    isOpen ? "rotate-180 text-emerald-700" : ""
+                                  }`}
+                                />
                               </div>
-                            </div>
+                            </button>
+
+                            {/* Card Body (Butir-butir Tugas di Dalam Accordion) */}
+                            {isOpen && (
+                              <div className="p-3 sm:p-4 pt-1 sm:pt-1 border-t border-slate-100 space-y-2 bg-slate-50/40">
+                                {group.exams.map((exam) => {
+                                  const isSelected = exam.examId === selectedExamId;
+                                  return (
+                                    <div
+                                      key={exam.examId}
+                                      onClick={() => setSelectedExamId(exam.examId)}
+                                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
+                                        isSelected
+                                          ? "bg-white border-emerald-600 shadow-xs ring-2 ring-emerald-600/30"
+                                          : "bg-white/90 border-slate-200 hover:bg-white hover:border-slate-300"
+                                      }`}
+                                    >
+                                      {/* Radio selector icon */}
+                                      <div className="mt-0.5 shrink-0">
+                                        <div
+                                          className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                                            isSelected
+                                              ? "border-emerald-600 bg-emerald-600"
+                                              : "border-slate-300 bg-white"
+                                          }`}
+                                        >
+                                          {isSelected && (
+                                            <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Exam Details */}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                                          {exam.status === "selesai" && (
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                              Sudah Selesai
+                                            </span>
+                                          )}
+                                          {exam.status === "sedang_mengerjakan" && (
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                              Sedang Berjalan
+                                            </span>
+                                          )}
+                                          {exam.status === "belum" && (
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                              Belum Dikerjakan
+                                            </span>
+                                          )}
+                                          {exam.scheduleState === "upcoming" && (
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                                              🕒 Belum Dibuka
+                                            </span>
+                                          )}
+                                          {exam.scheduleState === "ended" && exam.status !== "selesai" && (
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300">
+                                              Ditutup
+                                            </span>
+                                          )}
+                                          {exam.scheduleState === "open" && exam.startTime && (
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                                              🟢 Sedang Aktif
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <h5 className="text-xs font-bold text-slate-900 leading-snug">
+                                          {exam.examTitle}
+                                        </h5>
+
+                                        <p className="text-[11px] text-slate-500 mt-0.5">
+                                          Durasi: <span className="font-semibold text-slate-700">{exam.durationMinutes} Menit</span> &bull; {exam.totalQuestions} Soal
+                                        </p>
+
+                                        {exam.scheduleMessage && (
+                                          <p
+                                            className={`text-[10px] mt-1 font-medium ${
+                                              exam.scheduleState === "upcoming"
+                                                ? "text-amber-700"
+                                                : exam.scheduleState === "ended"
+                                                ? "text-slate-500"
+                                                : "text-emerald-700"
+                                            }`}
+                                          >
+                                            {exam.scheduleMessage}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -523,9 +674,37 @@ function ExamRegisterContent() {
                   )}
                 </div>
 
-                {/* Action Buttons */}
+                {/* Panel Info Tugas Terpilih & Action Buttons */}
                 {selectedExam && (
-                  <div className="pt-2">
+                  <div className="pt-2 space-y-3">
+                    <div className="p-3.5 rounded-xl bg-white border border-emerald-300 shadow-2xs">
+                      <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
+                        Tugas yang Anda Pilih:
+                      </span>
+                      <div className="flex items-center justify-between gap-2 mt-1">
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">
+                            {selectedExam.subjectName} &bull; Kelas {selectedExam.className}
+                          </p>
+                          <p className="text-xs text-emerald-900 font-medium">
+                            {selectedExam.examTitle} ({selectedExam.durationMinutes} Menit &bull; {selectedExam.totalQuestions} Soal)
+                          </p>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
+                          selectedExam.status === "selesai"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : selectedExam.status === "sedang_mengerjakan"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-slate-100 text-slate-700"
+                        }`}>
+                          {selectedExam.status === "selesai"
+                            ? "Sudah Selesai"
+                            : selectedExam.status === "sedang_mengerjakan"
+                            ? "Sedang Berjalan"
+                            : "Belum Dikerjakan"}
+                        </span>
+                      </div>
+                    </div>
                     {selectedExam.status === "selesai" ? (
                       <div className="space-y-2">
                         <div className="p-3 rounded-lg bg-emerald-100 text-emerald-900 text-xs font-medium">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import {
   Settings,
   Lock,
@@ -20,10 +21,16 @@ import {
   FileText,
   Clock,
   Layers,
+  User,
+  AlertCircle,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminSettingsPage() {
+  const { data: session } = useSession();
+  const isSuperAdmin = session?.user?.role === "superadmin";
+
   // Password states
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -215,14 +222,50 @@ export default function AdminSettingsPage() {
     <div className="space-y-6 max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-          Pengaturan & Kustomisasi Portal (SaaS Ready)
+          {isSuperAdmin
+            ? "Pengaturan & Kustomisasi Portal (SaaS Ready)"
+            : "Pengaturan Akun & Keamanan"}
         </h1>
         <p className="text-xs sm:text-sm text-slate-500">
-          Ubah logo, ilustrasi hero, nama instansi/kampus, judul, dan seluruh teks di dashboard mahasiswa secara dinamis
+          {isSuperAdmin
+            ? "Ubah logo, ilustrasi hero, nama instansi/kampus, judul, dan seluruh teks di dashboard mahasiswa secara dinamis"
+            : "Kelola profil pengajar dan perbarui kata sandi akun Anda"}
         </p>
       </div>
 
-      {/* SECTION 1: CUSTOM CMS PORTAL MAHASISWA */}
+      {/* Profil Dosen (Khusus Role Dosen) */}
+      {!isSuperAdmin && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-primary-100 text-primary-800 flex items-center justify-center font-bold text-lg">
+                {session?.user?.name?.charAt(0)?.toUpperCase() || "D"}
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  {session?.user?.name || "Dosen Pengampu"}
+                </h3>
+                <p className="text-xs text-slate-500 font-mono">
+                  Username: @{session?.user?.email || "dosen"}
+                </p>
+                <span className="inline-block mt-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  Dosen Pengajar
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+            <Info className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+            <div className="text-xs text-slate-600 leading-relaxed">
+              <strong className="text-slate-800">Manajemen Terpusat:</strong> Pengaturan identitas instansi, logo kampus, dan tampilan halaman depan mahasiswa dikelola secara profesional dan terpusat oleh <strong>Super Admin</strong> agar tidak saling menimpa antar dosen. Anda memiliki kendali penuh atas kelas, bank soal, dan tugas mandiri Anda.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 1: CUSTOM CMS PORTAL MAHASISWA (KHUSUS SUPER ADMIN) */}
+      {isSuperAdmin && (
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-6 space-y-6">
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -622,16 +665,17 @@ export default function AdminSettingsPage() {
           </form>
         )}
       </div>
+      )}
 
       {/* SECTION 2: CHANGE PASSWORD */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-6 space-y-4">
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <KeyRound className="w-4 h-4 text-emerald-700" />
-            <span>Keamanan &amp; Sandi Akun Dosen</span>
+            <span>Keamanan &amp; Sandi Akun {isSuperAdmin ? "Super Admin" : "Dosen"}</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Perbarui kata sandi secara berkala untuk menjaga kerahasiaan lembar soal ujian
+            Perbarui kata sandi akun Anda secara berkala untuk menjaga keamanan akses sistem
           </p>
         </div>
 

@@ -13,8 +13,8 @@ const createExamSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { searchParams } = new URL(request.url);
@@ -22,6 +22,16 @@ export async function GET(request: Request) {
 
     if (!classId) {
       return errorResponse('Parameter classId wajib diisi', 400);
+    }
+
+    const classData = await prisma.class.findUnique({ where: { id: classId } });
+    if (!classData) {
+      return errorResponse('Kelas tidak ditemukan', 404);
+    }
+
+    // 1 Dosen 1 Pintu
+    if (session.user.role !== 'superadmin' && classData.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki akses ke kelas ini', 403);
     }
 
     const exams = await prisma.exam.findMany({
@@ -45,8 +55,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const body = await request.json();
@@ -61,6 +71,11 @@ export async function POST(request: Request) {
     const classData = await prisma.class.findUnique({ where: { id: classId } });
     if (!classData) {
       return errorResponse('Kelas tidak ditemukan', 404);
+    }
+
+    // 1 Dosen 1 Pintu
+    if (session.user.role !== 'superadmin' && classData.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki akses ke kelas ini', 403);
     }
 
     const exam = await prisma.exam.create({

@@ -3,8 +3,21 @@ import { requireAdmin, successResponse, errorResponse } from "@/lib/utils";
 
 export async function GET() {
   try {
-    const { error } = await requireAdmin();
-    if (error) return error;
+    const { error, session } = await requireAdmin();
+    if (error || !session) return error;
+
+    const isSuperAdmin = session.user.role === "superadmin";
+    const currentAdminId = session.user.id;
+
+    // Filter berdasarkan peran (Role Dosen vs Super Admin)
+    const classWhere = isSuperAdmin ? {} : { adminId: currentAdminId };
+    const studentWhere = isSuperAdmin ? {} : { class: { adminId: currentAdminId } };
+    const activeExamWhere = isSuperAdmin
+      ? { isActive: true }
+      : { isActive: true, class: { adminId: currentAdminId } };
+    const sessionWhere = isSuperAdmin
+      ? { submittedAt: { not: null } }
+      : { submittedAt: { not: null }, exam: { class: { adminId: currentAdminId } } };
 
     // Eksekusi paralel 100% via Promise.all untuk kecepatan loading maksimal
     const [
@@ -17,16 +30,19 @@ export async function GET() {
       recentSubmissions,
     ] = await Promise.all([
       prisma.subject.count(),
-      prisma.class.count(),
-      prisma.student.count(),
-      prisma.exam.count({ where: { isActive: true } }),
-      prisma.examSession.count({ where: { submittedAt: { not: null } } }),
+      prisma.class.count({ where: classWhere }),
+      prisma.student.count({ where: studentWhere }),
+      prisma.exam.count({ where: activeExamWhere }),
+      prisma.examSession.count({ where: sessionWhere }),
       prisma.exam.findMany({
-        where: { isActive: true },
+        where: activeExamWhere,
         include: {
           class: {
             include: {
               subject: true,
+              admin: {
+                select: { id: true, name: true },
+              },
             },
           },
           _count: {
@@ -37,7 +53,7 @@ export async function GET() {
         take: 6,
       }),
       prisma.examSession.findMany({
-        where: { submittedAt: { not: null } },
+        where: sessionWhere,
         orderBy: { submittedAt: "desc" },
         take: 6,
         include: {
@@ -46,6 +62,9 @@ export async function GET() {
               class: {
                 include: {
                   subject: true,
+                  admin: {
+                    select: { id: true, name: true },
+                  },
                 },
               },
             },
@@ -60,12 +79,14 @@ export async function GET() {
       studentCount,
       activeExamCount,
       sessionCount,
+      isSuperAdmin,
       activeExams: activeExams.map((exam: any) => ({
         id: exam.id,
         title: exam.title,
         classId: exam.class?.id || "",
         subjectId: exam.class?.subject?.id || "",
         className: exam.class?.name || "Kelas",
+        lecturerName: exam.class?.admin?.name || null,
         subjectName: exam.subjectName || exam.class?.subject?.name || "Mata Kuliah Umum",
         sessionCount: exam._count.sessions,
         durationMinutes: exam.durationMinutes,
@@ -77,6 +98,7 @@ export async function GET() {
         examTitle: s.exam?.title || "Ujian",
         subjectName: s.exam?.subjectName || s.exam?.class?.subject?.name || "Mata Kuliah Umum",
         className: s.exam?.class?.name || "Kelas",
+        lecturerName: s.exam?.class?.admin?.name || null,
         submittedAt: s.submittedAt,
       })),
     });

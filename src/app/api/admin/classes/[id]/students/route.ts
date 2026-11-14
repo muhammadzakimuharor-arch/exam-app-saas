@@ -32,8 +32,8 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { id: classId } = await params;
@@ -57,6 +57,11 @@ export async function GET(
 
     if (!classData) {
       return errorResponse('Kelas tidak ditemukan', 404);
+    }
+
+    // 1 Dosen 1 Pintu: Pastikan kelas milik dosen yang login jika bukan superadmin
+    if (session.user.role !== 'superadmin' && classData.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki akses ke kelas ini', 403);
     }
 
     // Ambil riwayat pengerjaan semua mahasiswa di kelas ini
@@ -88,12 +93,11 @@ export async function GET(
         isAllowed: student.isAllowed !== false,
         allowExamReason: student.allowExamReason || null,
         createdAt: student.createdAt,
-        examsStatus: classData.exams.map((exam) => {
+        examsProgress: classData.exams.map((exam) => {
           const session = studentSessions.find((s) => s.examId === exam.id);
           return {
             examId: exam.id,
             examTitle: exam.title,
-            subjectName: exam.subjectName || null,
             status: !session
               ? 'belum'
               : session.submittedAt
@@ -121,8 +125,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { id: classId } = await params;
@@ -131,6 +135,16 @@ export async function POST(
 
     if (!validation.success) {
       return errorResponse(validation.error.issues[0]?.message || 'Input tidak valid', 400);
+    }
+
+    const classData = await prisma.class.findUnique({
+      where: { id: classId },
+    });
+    if (!classData) {
+      return errorResponse('Kelas tidak ditemukan', 404);
+    }
+    if (session.user.role !== 'superadmin' && classData.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki akses ke kelas ini', 403);
     }
 
     const { nim, name, bulkText, students } = validation.data;
@@ -239,8 +253,8 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { id: classId } = await params;
@@ -251,9 +265,18 @@ export async function PUT(
       return errorResponse(validation.error.issues[0]?.message || 'Input tidak valid', 400);
     }
 
+    const classData = await prisma.class.findUnique({
+      where: { id: classId },
+    });
+    if (!classData) {
+      return errorResponse('Kelas tidak ditemukan', 404);
+    }
+    if (session.user.role !== 'superadmin' && classData.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki akses ke kelas ini', 403);
+    }
+
     const { studentId, nim, name, isAllowed, allowExamReason } = validation.data;
 
-    // Cek apakah mahasiswa ada di kelas ini
     const student = await prisma.student.findUnique({
       where: { id: studentId },
     });
@@ -262,7 +285,6 @@ export async function PUT(
       return errorResponse('Mahasiswa tidak ditemukan di kelas ini', 404);
     }
 
-    // Cek konflik NIM di kelas yang sama
     const duplicate = await prisma.student.findFirst({
       where: {
         classId,
@@ -296,8 +318,8 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { id: classId } = await params;
@@ -306,6 +328,16 @@ export async function PATCH(
 
     if (!validation.success) {
       return errorResponse(validation.error.issues[0]?.message || 'Input tidak valid', 400);
+    }
+
+    const classData = await prisma.class.findUnique({
+      where: { id: classId },
+    });
+    if (!classData) {
+      return errorResponse('Kelas tidak ditemukan', 404);
+    }
+    if (session.user.role !== 'superadmin' && classData.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki akses ke kelas ini', 403);
     }
 
     const { studentId, isAllowed, reason } = validation.data;
@@ -334,8 +366,8 @@ export async function PATCH(
 }
 
 export async function DELETE(request: Request) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { searchParams } = new URL(request.url);
@@ -343,6 +375,21 @@ export async function DELETE(request: Request) {
 
     if (!studentId) {
       return errorResponse('Parameter studentId wajib disertakan', 400);
+    }
+
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+      include: {
+        class: true,
+      },
+    });
+
+    if (!student) {
+      return errorResponse('Mahasiswa tidak ditemukan', 404);
+    }
+
+    if (session.user.role !== 'superadmin' && student.class.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki akses ke kelas mahasiswa ini', 403);
     }
 
     await prisma.student.delete({

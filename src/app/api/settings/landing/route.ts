@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAdmin, successResponse, errorResponse } from '@/lib/utils';
+import { requireSuperAdmin, successResponse, errorResponse } from '@/lib/utils';
 import { z } from 'zod';
 
 const updateLandingSchema = z.object({
@@ -52,7 +52,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const { error } = await requireAdmin();
+  const { error } = await requireSuperAdmin();
   if (error) return error;
 
   try {

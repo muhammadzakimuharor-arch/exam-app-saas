@@ -6,14 +6,15 @@ const updateClassSchema = z.object({
   name: z.string().min(1, 'Nama kelas wajib diisi'),
   level: z.string().optional(),
   description: z.string().optional(),
+  adminId: z.string().optional(), // Khusus superadmin
 });
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { id } = await params;
@@ -22,6 +23,13 @@ export async function GET(
       where: { id },
       include: {
         subject: true,
+        admin: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+          },
+        },
         exams: {
           include: {
             questions: {
@@ -46,6 +54,11 @@ export async function GET(
       return errorResponse('Kelas tidak ditemukan', 404);
     }
 
+    // 1 Dosen 1 Pintu: Cek kepemilikan kelas jika bukan superadmin
+    if (session.user.role !== 'superadmin' && classData.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki akses ke kelas ini', 403);
+    }
+
     return successResponse(classData);
   } catch (err) {
     console.error('Error fetching class:', err);
@@ -57,8 +70,8 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { id } = await params;
@@ -74,12 +87,23 @@ export async function PUT(
       return errorResponse('Kelas tidak ditemukan', 404);
     }
 
-    const { name, level, description } = validation.data;
+    // 1 Dosen 1 Pintu: Cek kepemilikan kelas jika bukan superadmin
+    if (session.user.role !== 'superadmin' && existing.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki izin mengedit kelas ini', 403);
+    }
+
+    const { name, level, description, adminId } = validation.data;
+
+    // Cek duplikasi nama di bawah dosen pemilik kelas tersebut
+    const targetAdminId = (session.user.role === 'superadmin' && adminId !== undefined)
+      ? adminId
+      : existing.adminId;
 
     const duplicate = await prisma.class.findFirst({
       where: {
         name: { equals: name.trim(), mode: 'insensitive' },
         id: { not: id },
+        adminId: targetAdminId,
       },
     });
 
@@ -93,9 +117,17 @@ export async function PUT(
         name: name.trim(),
         level: level !== undefined ? (level?.trim() || null) : existing.level,
         description: description !== undefined ? (description?.trim() || null) : existing.description,
+        ...(session.user.role === 'superadmin' && adminId !== undefined ? { adminId: adminId || null } : {}),
       },
       include: {
         subject: true,
+        admin: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+          },
+        },
         exams: {
           orderBy: { createdAt: 'desc' },
         },
@@ -116,8 +148,8 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { id } = await params;
@@ -125,6 +157,11 @@ export async function DELETE(
     const existing = await prisma.class.findUnique({ where: { id } });
     if (!existing) {
       return errorResponse('Kelas tidak ditemukan', 404);
+    }
+
+    // 1 Dosen 1 Pintu: Cek kepemilikan kelas jika bukan superadmin
+    if (session.user.role !== 'superadmin' && existing.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki izin menghapus kelas ini', 403);
     }
 
     await prisma.class.delete({ where: { id } });

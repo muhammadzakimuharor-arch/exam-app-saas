@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import {
   Users,
   BookOpen,
@@ -17,6 +18,7 @@ import {
   Loader2,
   Layers,
   FolderOpen,
+  UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,6 +36,12 @@ interface ClassItem {
   level: string | null;
   description: string | null;
   createdAt: string;
+  adminId?: string | null;
+  admin?: {
+    id: string;
+    name: string;
+    username: string;
+  } | null;
   subject?: {
     id: string;
     name: string;
@@ -46,9 +54,13 @@ interface ClassItem {
 }
 
 export default function ClassesListPage() {
+  const { data: session } = useSession();
+  const isSuperAdmin = session?.user?.role === "superadmin";
+
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [lecturers, setLecturers] = useState<{ id: string; name: string; username: string }[]>([]);
 
   // Modal Tambah / Edit Kelas
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -56,6 +68,7 @@ export default function ClassesListPage() {
   const [className, setClassName] = useState("");
   const [classLevel, setClassLevel] = useState("");
   const [classDescription, setClassDescription] = useState("");
+  const [classAdminId, setClassAdminId] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   // Modal Hapus Kelas
@@ -80,11 +93,26 @@ export default function ClassesListPage() {
     fetchClasses();
   }, [fetchClasses]);
 
+  // Jika superadmin, fetch daftar dosen untuk opsi assignment kelas
+  useEffect(() => {
+    if (isSuperAdmin) {
+      fetch("/api/admin/lecturers")
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setLecturers(data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isSuperAdmin]);
+
   const handleOpenAddModal = () => {
     setEditingClass(null);
     setClassName("");
     setClassLevel("");
     setClassDescription("");
+    setClassAdminId(session?.user?.id || "");
     setIsModalOpen(true);
   };
 
@@ -93,6 +121,7 @@ export default function ClassesListPage() {
     setClassName(c.name);
     setClassLevel(c.level || "");
     setClassDescription(c.description || "");
+    setClassAdminId(c.adminId || c.admin?.id || "");
     setIsModalOpen(true);
   };
 
@@ -114,6 +143,7 @@ export default function ClassesListPage() {
             name: className.trim(),
             level: classLevel.trim() || undefined,
             description: classDescription.trim() || undefined,
+            adminId: isSuperAdmin ? classAdminId : undefined,
           }),
         });
         const data = await res.json();
@@ -128,6 +158,7 @@ export default function ClassesListPage() {
             name: className.trim(),
             level: classLevel.trim() || undefined,
             description: classDescription.trim() || undefined,
+            adminId: isSuperAdmin && classAdminId ? classAdminId : undefined,
           }),
         });
         const data = await res.json();
@@ -323,6 +354,17 @@ export default function ClassesListPage() {
                     </div>
                   </div>
 
+                  {/* Superadmin Lecturer Badge */}
+                  {isSuperAdmin && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
+                      <UserCheck className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span className="text-slate-500 font-normal">Dosen Pengampu:</span>
+                      <strong className="text-slate-800 truncate">
+                        {c.admin?.name || "Belum Ditugaskan"}
+                      </strong>
+                    </div>
+                  )}
+
                   {/* Preview Exams in this class */}
                   {c.exams && c.exams.length > 0 && (
                     <div className="pt-2 border-t border-slate-100 space-y-1.5">
@@ -435,6 +477,26 @@ export default function ClassesListPage() {
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700 bg-white resize-none"
                 />
               </div>
+
+              {isSuperAdmin && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Dosen Pengampu Kelas (Khusus Super Admin)
+                  </label>
+                  <select
+                    value={classAdminId}
+                    onChange={(e) => setClassAdminId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700 bg-white"
+                  >
+                    <option value="">-- Tetapkan Pemilik Kelas --</option>
+                    {lecturers.map((lec) => (
+                      <option key={lec.id} value={lec.id}>
+                        {lec.name} ({lec.username})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button

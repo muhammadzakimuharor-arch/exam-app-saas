@@ -12,8 +12,8 @@ const createQuestionSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { searchParams } = new URL(request.url);
@@ -21,6 +21,19 @@ export async function GET(request: Request) {
 
     if (!examId) {
       return errorResponse('Parameter examId wajib diisi', 400);
+    }
+
+    const exam = await prisma.exam.findUnique({
+      where: { id: examId },
+      include: { class: true },
+    });
+    if (!exam) {
+      return errorResponse('Ujian tidak ditemukan', 404);
+    }
+
+    // 1 Dosen 1 Pintu
+    if (session.user.role !== 'superadmin' && exam.class.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki akses ke soal ujian ini', 403);
     }
 
     const questions = await prisma.question.findMany({
@@ -36,8 +49,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const body = await request.json();
@@ -49,9 +62,17 @@ export async function POST(request: Request) {
 
     const { examId, text, order, points, allowFileUpload, fileRequired } = validation.data;
 
-    const exam = await prisma.exam.findUnique({ where: { id: examId } });
+    const exam = await prisma.exam.findUnique({
+      where: { id: examId },
+      include: { class: true },
+    });
     if (!exam) {
       return errorResponse('Ujian tidak ditemukan', 404);
+    }
+
+    // 1 Dosen 1 Pintu
+    if (session.user.role !== 'superadmin' && exam.class.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki akses ke ujian ini', 403);
     }
 
     let questionOrder = order;

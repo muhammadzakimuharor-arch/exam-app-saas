@@ -13,9 +13,11 @@ import {
   Menu,
   X,
   GraduationCap,
+  Users,
+  ShieldCheck,
 } from "lucide-react";
 
-const navLinks = [
+const baseNavLinks = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/classes", label: "Kelas & Penugasan", icon: BookOpen },
   { href: "/admin/answers", label: "Jawaban Mahasiswa", icon: FileText },
@@ -26,6 +28,23 @@ function SidebarInner() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const isSuperAdmin = session?.user?.role === "superadmin";
+
+  const navLinks = isSuperAdmin
+    ? [
+        { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/admin/lecturers", label: "Kelola Dosen", icon: Users },
+        { href: "/admin/classes", label: "Kelas & Penugasan", icon: BookOpen },
+        { href: "/admin/answers", label: "Jawaban Mahasiswa", icon: FileText },
+        { href: "/admin/settings", label: "Pengaturan & Tampilan", icon: Settings },
+      ]
+    : [
+        { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/admin/classes", label: "Kelas & Penugasan", icon: BookOpen },
+        { href: "/admin/answers", label: "Jawaban Mahasiswa", icon: FileText },
+        { href: "/admin/settings", label: "Pengaturan Akun", icon: Settings },
+      ];
 
   const isActive = (href: string) => {
     if (href === "/admin/dashboard") return pathname === href;
@@ -77,7 +96,9 @@ function SidebarInner() {
             <p className="text-sm font-medium text-white truncate">
               {session?.user?.name || "Admin"}
             </p>
-            <p className="text-xs text-primary-300 truncate">Administrator</p>
+            <p className="text-xs text-primary-300 truncate">
+              {isSuperAdmin ? "Super Admin" : "Dosen Pengampu"}
+            </p>
           </div>
         </div>
         <button

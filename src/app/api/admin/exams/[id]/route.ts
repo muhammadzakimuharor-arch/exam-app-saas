@@ -16,8 +16,8 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { id } = await params;
@@ -31,6 +31,13 @@ export async function GET(
         class: {
           include: {
             subject: true,
+            admin: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+              },
+            },
           },
         },
       },
@@ -38,6 +45,11 @@ export async function GET(
 
     if (!exam) {
       return errorResponse('Ujian tidak ditemukan', 404);
+    }
+
+    // 1 Dosen 1 Pintu
+    if (session.user.role !== 'superadmin' && exam.class.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki akses ke ujian ini', 403);
     }
 
     return successResponse(exam);
@@ -51,8 +63,8 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { id } = await params;
@@ -63,9 +75,17 @@ export async function PUT(
       return errorResponse(validation.error.issues[0]?.message || 'Input tidak valid', 400);
     }
 
-    const existing = await prisma.exam.findUnique({ where: { id } });
+    const existing = await prisma.exam.findUnique({
+      where: { id },
+      include: { class: true },
+    });
     if (!existing) {
       return errorResponse('Ujian tidak ditemukan', 404);
+    }
+
+    // 1 Dosen 1 Pintu
+    if (session.user.role !== 'superadmin' && existing.class.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki akses ke ujian ini', 403);
     }
 
     const { title, subjectName, durationMinutes, minWords, isActive, startTime, endTime } = validation.data;
@@ -108,15 +128,23 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { id } = await params;
 
-    const existing = await prisma.exam.findUnique({ where: { id } });
+    const existing = await prisma.exam.findUnique({
+      where: { id },
+      include: { class: true },
+    });
     if (!existing) {
       return errorResponse('Ujian tidak ditemukan', 404);
+    }
+
+    // 1 Dosen 1 Pintu
+    if (session.user.role !== 'superadmin' && existing.class.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki akses ke ujian ini', 403);
     }
 
     await prisma.exam.delete({ where: { id } });

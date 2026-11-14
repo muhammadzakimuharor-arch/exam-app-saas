@@ -14,8 +14,8 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { id } = await params;
@@ -26,9 +26,22 @@ export async function PUT(
       return errorResponse(validation.error.issues[0]?.message || 'Input tidak valid', 400);
     }
 
-    const existing = await prisma.question.findUnique({ where: { id } });
+    const existing = await prisma.question.findUnique({
+      where: { id },
+      include: {
+        exam: {
+          include: { class: true },
+        },
+      },
+    });
+
     if (!existing) {
       return errorResponse('Soal tidak ditemukan', 404);
+    }
+
+    // 1 Dosen 1 Pintu
+    if (session.user.role !== 'superadmin' && existing.exam.class.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki akses ke soal ujian ini', 403);
     }
 
     const { text, order, points, allowFileUpload, fileRequired } = validation.data;
@@ -55,15 +68,28 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin();
-  if (error) return error;
+  const { error, session } = await requireAdmin();
+  if (error || !session) return error;
 
   try {
     const { id } = await params;
 
-    const existing = await prisma.question.findUnique({ where: { id } });
+    const existing = await prisma.question.findUnique({
+      where: { id },
+      include: {
+        exam: {
+          include: { class: true },
+        },
+      },
+    });
+
     if (!existing) {
       return errorResponse('Soal tidak ditemukan', 404);
+    }
+
+    // 1 Dosen 1 Pintu
+    if (session.user.role !== 'superadmin' && existing.exam.class.adminId !== session.user.id) {
+      return errorResponse('Akses ditolak: Anda tidak memiliki izin menghapus soal ini', 403);
     }
 
     await prisma.question.delete({ where: { id } });
