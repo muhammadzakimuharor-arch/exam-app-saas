@@ -1,32 +1,39 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
 
-export async function GET() {
-  const envCheck = {
-    hasDatabaseUrl: !!process.env.DATABASE_URL,
-    hasDirectUrl: !!process.env.DIRECT_URL,
-    hasNextAuthSecret: !!process.env.NEXTAUTH_SECRET,
-    hasNextAuthUrl: process.env.NEXTAUTH_URL || null,
-    databaseUrlHost: process.env.DATABASE_URL ? process.env.DATABASE_URL.split('@')[1] : null,
-  };
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const testHost = url.searchParams.get('host') || 'aws-0-ap-southeast-1.pooler.supabase.com';
+  const testPort = url.searchParams.get('port') || '6543';
+  const mode = url.searchParams.get('mode') || 'transaction';
 
-  let dbStatus = 'untested';
-  let dbError = null;
+  const user = mode === 'transaction' || testPort === '6543'
+    ? 'postgres.pyvnphypseywhgofpleo'
+    : 'postgres';
+
+  const testConnStr = `postgresql://${user}:xRek58R69t5aZz31@${testHost}:${testPort}/postgres?pgbouncer=true&sslmode=require`;
+
+  const prismaTest = new PrismaClient({
+    datasources: { db: { url: testConnStr } },
+  });
 
   try {
-    const adminCount = await prisma.admin.count();
-    dbStatus = `connected, found ${adminCount} admins`;
+    const adminCount = await prismaTest.admin.count();
+    await prismaTest.$disconnect();
+    return NextResponse.json({
+      status: 'SUCCESS',
+      host: testHost,
+      port: testPort,
+      connStrSanitized: testConnStr.replace('xRek58R69t5aZz31', '***'),
+      adminCount,
+    });
   } catch (err: any) {
-    dbStatus = 'failed';
-    dbError = {
-      message: err.message,
-      code: err.code,
-    };
+    await prismaTest.$disconnect();
+    return NextResponse.json({
+      status: 'FAILED',
+      host: testHost,
+      port: testPort,
+      error: err.message,
+    });
   }
-
-  return NextResponse.json({
-    envCheck,
-    dbStatus,
-    dbError,
-  });
 }
