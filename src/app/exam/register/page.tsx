@@ -36,6 +36,7 @@ interface AvailableExam {
   classId: string;
   subjectName: string;
   subjectLevel: string | null;
+  lecturerName?: string | null;
   status: "belum" | "sedang_mengerjakan" | "selesai";
   sessionId?: string;
   startTime?: string | null;
@@ -123,7 +124,7 @@ function ExamRegisterContent() {
       // Inisialisasi status buka/tutup accordion
       const initialOpen: Record<string, boolean> = {};
       rawExams.forEach((exam) => {
-        const groupKey = `${exam.classId}__${exam.subjectName}`;
+        const groupKey = `${exam.classId}__${exam.subjectName}__${exam.lecturerName || ""}`;
         if (initialOpen[groupKey] === undefined) {
           // Buka grup secara default agar tugas langsung terlihat
           initialOpen[groupKey] = true;
@@ -154,9 +155,9 @@ function ExamRegisterContent() {
     }));
   };
 
-  // Grouping daftar tugas berdasarkan Mata Kuliah & Kelas
+  // Grouping daftar tugas berdasarkan Mata Kuliah, Kelas, & Dosen Pengampu
   const groupedExams = availableExams.reduce((acc, exam) => {
-    const key = `${exam.classId}__${exam.subjectName}`;
+    const key = `${exam.classId}__${exam.subjectName}__${exam.lecturerName || ""}`;
     if (!acc[key]) {
       acc[key] = {
         groupKey: key,
@@ -164,6 +165,7 @@ function ExamRegisterContent() {
         className: exam.className,
         classId: exam.classId,
         subjectLevel: exam.subjectLevel,
+        lecturerName: exam.lecturerName || null,
         exams: [],
         totalCount: 0,
         activeCount: 0,
@@ -184,6 +186,7 @@ function ExamRegisterContent() {
     className: string;
     classId: string;
     subjectLevel: string | null;
+    lecturerName: string | null;
     exams: AvailableExam[];
     totalCount: number;
     activeCount: number;
@@ -536,15 +539,17 @@ function ExamRegisterContent() {
                               className="w-full flex items-center justify-between p-3.5 sm:p-4 hover:bg-slate-50/80 transition-colors text-left cursor-pointer"
                             >
                               <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
                                   <BookOpen className="w-4 h-4" />
                                 </div>
                                 <div className="min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                                      {group.subjectName}
-                                    </h4>
-                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                  {/* Badge Dosen Pengampu & Kelas */}
+                                  <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-800 text-white shadow-2xs">
+                                      <User className="w-3 h-3" />
+                                      <span>Dosen: {group.lecturerName || "Pengajar Kelas"}</span>
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                                       Kelas {group.className}
                                     </span>
                                     {group.subjectLevel && (
@@ -553,19 +558,22 @@ function ExamRegisterContent() {
                                       </span>
                                     )}
                                   </div>
+                                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                                    {group.subjectName}
+                                  </h4>
                                   <p className="text-[11px] text-slate-500 mt-0.5">
-                                    {group.totalCount} Tugas &bull; {group.completedCount} Selesai &bull; {group.activeCount} Belum Selesai
+                                    Terdapat <strong className="text-slate-700">{group.totalCount} tugas</strong> &bull; {group.completedCount} selesai &bull; {group.activeCount} belum dikerjakan
                                   </p>
                                 </div>
                               </div>
 
                               <div className="flex items-center gap-2.5 shrink-0 ml-2">
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold shadow-2xs ${
                                   group.activeCount > 0
                                     ? "bg-emerald-50 text-emerald-800 border border-emerald-300"
                                     : "bg-slate-100 text-slate-600 border border-slate-200"
                                 }`}>
-                                  {group.totalCount} Tugas
+                                  {group.totalCount} Tugas Tersedia
                                 </span>
                                 <ChevronDown
                                   className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
@@ -683,10 +691,15 @@ function ExamRegisterContent() {
                       </span>
                       <div className="flex items-center justify-between gap-2 mt-1">
                         <div>
-                          <p className="text-xs font-bold text-slate-900">
-                            {selectedExam.subjectName} &bull; Kelas {selectedExam.className}
-                          </p>
-                          <p className="text-xs text-emerald-900 font-medium">
+                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              Dosen: {selectedExam.lecturerName || "Pengajar Kelas"}
+                            </span>
+                            <span className="text-xs font-bold text-slate-900">
+                              {selectedExam.subjectName} &bull; Kelas {selectedExam.className}
+                            </span>
+                          </div>
+                          <p className="text-xs text-emerald-900 font-semibold">
                             {selectedExam.examTitle} ({selectedExam.durationMinutes} Menit &bull; {selectedExam.totalQuestions} Soal)
                           </p>
                         </div>

@@ -27,6 +27,12 @@ export async function GET(request: Request) {
         class: {
           include: {
             subject: true,
+            admin: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
             exams: {
               where: {
                 OR: [
@@ -92,6 +98,7 @@ export async function GET(request: Request) {
       classId: string;
       subjectName: string;
       subjectLevel: string | null;
+      lecturerName: string | null;
       status: string; // 'belum' | 'sedang' | 'selesai'
       sessionId?: string;
       startTime: string | null;
@@ -158,6 +165,7 @@ export async function GET(request: Request) {
           classId: s.class.id,
           subjectName: exam.subjectName || s.class.subject?.name || 'Mata Kuliah Umum',
           subjectLevel: s.class.level || s.class.subject?.level || null,
+          lecturerName: s.class.admin?.name || null,
           status,
           sessionId: session?.id,
           startTime: exam.startTime ? exam.startTime.toISOString() : null,
