@@ -16,7 +16,18 @@ export async function PUT(
 
     const session = await prisma.examSession.findUnique({
       where: { id: sessionId },
-      select: { id: true, submittedAt: true, examId: true },
+      select: {
+        id: true,
+        submittedAt: true,
+        examId: true,
+        startedAt: true,
+        exam: {
+          select: {
+            durationMinutes: true,
+            endTime: true,
+          },
+        },
+      },
     });
 
     if (!session) {
@@ -25,6 +36,21 @@ export async function PUT(
 
     if (session.submittedAt) {
       return errorResponse('Ujian sudah dikumpulkan, tidak dapat mengubah jawaban', 400);
+    }
+
+    // Proteksi batas waktu backend (anti tampering & manipulasi request API)
+    const now = new Date();
+    const maxDurationMs = (session.exam.durationMinutes + 5) * 60 * 1000;
+    const elapsedMs = now.getTime() - new Date(session.startedAt).getTime();
+    if (elapsedMs > maxDurationMs) {
+      return errorResponse('Batas waktu pengerjaan ujian telah berakhir', 400);
+    }
+
+    if (session.exam.endTime) {
+      const examDeadlineMs = new Date(session.exam.endTime).getTime() + 5 * 60 * 1000;
+      if (now.getTime() > examDeadlineMs) {
+        return errorResponse('Jadwal ujian telah berakhir', 400);
+      }
     }
 
     const body = await request.json();

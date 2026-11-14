@@ -3,10 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { ShieldAlert, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 export default function StudentSecurityGuard() {
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith("/admin");
+  const isExamPage = pathname?.startsWith("/exam/");
   const [isDevToolsOpen, setIsDevToolsOpen] = useState(false);
 
   // Check DevTools presence via viewport delta & timing
@@ -74,10 +76,43 @@ export default function StudentSecurityGuard() {
       }
 
       // Ctrl + S or Ctrl + P
-      if (e.ctrlKey && (key === "s" || key === "p")) {
+      if ((e.ctrlKey || e.metaKey) && (key === "s" || key === "p")) {
         e.preventDefault();
         e.stopPropagation();
         return false;
+      }
+
+      // Shift + F10 or Apps Key (Context Menu Keyboard Shortcut)
+      if ((e.shiftKey && key === "f10") || e.code === "ContextMenu") {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+
+      // LAPIS KEAMANAN KETAT: ANTI COPY & PASTE CONTEKAN PADA LEMBAR UJIAN
+      if (isExamPage) {
+        // Blokir Ctrl+C / Cmd+C (Copy Soal)
+        if ((e.ctrlKey || e.metaKey) && key === "c") {
+          e.preventDefault();
+          e.stopPropagation();
+          toast.warning("Tindakan menyalin (Copy) dinonaktifkan demi integritas ujian.");
+          return false;
+        }
+
+        // Blokir Ctrl+V / Cmd+V (Paste Contekan Luar)
+        if ((e.ctrlKey || e.metaKey) && key === "v") {
+          e.preventDefault();
+          e.stopPropagation();
+          toast.warning("Tindakan menempelkan teks (Paste) dinonaktifkan. Silakan ketik uraian Anda secara mandiri.");
+          return false;
+        }
+
+        // Blokir Ctrl+X / Cmd+X (Cut)
+        if ((e.ctrlKey || e.metaKey) && key === "x") {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
       }
     };
 
@@ -87,7 +122,36 @@ export default function StudentSecurityGuard() {
       return false;
     };
 
-    // Override console output to prevent reading scripts
+    // Clipboard event prevention
+    const handleCopy = (e: ClipboardEvent) => {
+      e.preventDefault();
+      toast.warning("Menyalin teks dinonaktifkan demi integritas akademik.");
+      return false;
+    };
+
+    const handlePaste = (e: ClipboardEvent) => {
+      if (isExamPage) {
+        e.preventDefault();
+        toast.warning("Menempelkan teks (Paste) dilarang. Harap ketik jawaban secara langsung.");
+        return false;
+      }
+    };
+
+    const handleCut = (e: ClipboardEvent) => {
+      e.preventDefault();
+      return false;
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      // Izinkan drag drop hanya untuk file picker jika diperlukan, tolak drop teks liar
+      const target = e.target as HTMLElement | null;
+      if (!target || target.tagName !== "INPUT" || (target as HTMLInputElement).type !== "file") {
+        e.preventDefault();
+        return false;
+      }
+    };
+
+    // Override console output to prevent reading scripts & tampering
     if (typeof window !== "undefined") {
       const emptyFunc = () => {};
       try {
@@ -98,6 +162,8 @@ export default function StudentSecurityGuard() {
         console.debug = emptyFunc;
         console.dir = emptyFunc;
         console.table = emptyFunc;
+        console.trace = emptyFunc;
+        console.clear();
       } catch {
         // ignore
       }
@@ -109,6 +175,10 @@ export default function StudentSecurityGuard() {
     // Listeners
     window.addEventListener("keydown", handleKeyDown, true);
     window.addEventListener("contextmenu", handleContextMenu, true);
+    window.addEventListener("copy", handleCopy, true);
+    window.addEventListener("paste", handlePaste, true);
+    window.addEventListener("cut", handleCut, true);
+    window.addEventListener("drop", handleDrop, true);
     window.addEventListener("resize", checkDevTools);
 
     // Periodic detection loop
@@ -117,10 +187,14 @@ export default function StudentSecurityGuard() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
       window.removeEventListener("contextmenu", handleContextMenu, true);
+      window.removeEventListener("copy", handleCopy, true);
+      window.removeEventListener("paste", handlePaste, true);
+      window.removeEventListener("cut", handleCut, true);
+      window.removeEventListener("drop", handleDrop, true);
       window.removeEventListener("resize", checkDevTools);
       clearInterval(interval);
     };
-  }, [isAdmin, checkDevTools]);
+  }, [isAdmin, isExamPage, checkDevTools]);
 
   // Don't render anything for admin routes or when DevTools is closed
   if (isAdmin || !isDevToolsOpen) {

@@ -13,7 +13,18 @@ export async function POST(
 
     const session = await prisma.examSession.findUnique({
       where: { id: sessionId },
-      select: { id: true, submittedAt: true, examId: true },
+      select: {
+        id: true,
+        submittedAt: true,
+        examId: true,
+        startedAt: true,
+        exam: {
+          select: {
+            durationMinutes: true,
+            endTime: true,
+          },
+        },
+      },
     });
 
     if (!session) {
@@ -28,6 +39,27 @@ export async function POST(
         { error: 'Ujian sudah dikumpulkan, tidak dapat mengunggah file' },
         { status: 400 }
       );
+    }
+
+    // Proteksi batas waktu backend (anti tampering file upload)
+    const now = new Date();
+    const maxDurationMs = (session.exam.durationMinutes + 5) * 60 * 1000;
+    const elapsedMs = now.getTime() - new Date(session.startedAt).getTime();
+    if (elapsedMs > maxDurationMs) {
+      return NextResponse.json(
+        { error: 'Batas waktu pengerjaan ujian telah berakhir' },
+        { status: 400 }
+      );
+    }
+
+    if (session.exam.endTime) {
+      const examDeadlineMs = new Date(session.exam.endTime).getTime() + 5 * 60 * 1000;
+      if (now.getTime() > examDeadlineMs) {
+        return NextResponse.json(
+          { error: 'Jadwal ujian telah berakhir' },
+          { status: 400 }
+        );
+      }
     }
 
     const formData = await request.formData();

@@ -573,7 +573,7 @@ function ExamSessionContent() {
             </div>
 
             {/* Question Text */}
-            <div className="text-slate-800 text-base sm:text-lg font-medium leading-relaxed whitespace-pre-wrap">
+            <div className="text-slate-800 text-base sm:text-lg font-medium leading-relaxed whitespace-pre-wrap select-none select-none-all">
               {currentQuestion.text}
             </div>
 
