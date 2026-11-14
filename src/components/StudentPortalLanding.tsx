@@ -82,6 +82,7 @@ export default function StudentPortalLanding({
                 height={40}
                 className="w-full h-full object-contain"
                 priority
+                unoptimized
               />
             </div>
             <div className="flex flex-col">
@@ -193,6 +194,7 @@ export default function StudentPortalLanding({
                     height={541}
                     className="w-full h-auto object-cover object-center filter brightness-105 contrast-105"
                     priority
+                    unoptimized
                   />
                   {/* Gentle bottom shade */}
                   <div className="absolute inset-0 bg-gradient-to-t from-[#02231c]/50 via-transparent to-transparent pointer-events-none" />
