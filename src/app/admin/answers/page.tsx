@@ -63,6 +63,20 @@ interface StudentSession {
   answers: AnswerDetail[];
 }
 
+function formatDuration(startedAt: string, submittedAt: string | null): string {
+  if (!startedAt) return "-";
+  const start = new Date(startedAt).getTime();
+  const end = submittedAt ? new Date(submittedAt).getTime() : Date.now();
+  const diffMinutes = Math.max(1, Math.round((end - start) / (1000 * 60)));
+
+  if (diffMinutes < 60) {
+    return `${diffMinutes} Menit`;
+  }
+  const hours = Math.floor(diffMinutes / 60);
+  const mins = diffMinutes % 60;
+  return mins > 0 ? `${hours} Jam ${mins} Menit` : `${hours} Jam`;
+}
+
 export default function AnswersReviewPage() {
   // Filters: Kelas -> Mata Kuliah & Ujian
   const [classes, setClasses] = useState<ClassOption[]>([]);
@@ -183,6 +197,7 @@ export default function AnswersReviewPage() {
       doc.text("Sistem Evaluasi Akademik Digital Terintegrasi", 105, 17, { align: "center" });
 
       // Student Meta Table
+      const durationText = formatDuration(session.startedAt, session.submittedAt);
       const studentMeta = [
         ["Nama Mahasiswa", `: ${session.studentName}`, "Mata Kuliah", `: ${currentSubject}`],
         ["NIM", `: ${session.studentNim}`, "Kelas", `: Kelas ${currentClass}`],
@@ -193,10 +208,16 @@ export default function AnswersReviewPage() {
           `: ${session.submittedAt ? new Date(session.submittedAt).toLocaleString("id-ID") : "Belum submit"}`,
         ],
         [
+          "Durasi Pengerjaan",
+          `: ${durationText}`,
           "Status Pengerjaan",
           `: ${session.submittedAt ? "SELESAI (Dikumpulkan)" : "SEDANG BERJALAN"}`,
+        ],
+        [
           "Alamat IP",
           `: ${session.ipAddress || "Lokal / Internal"}`,
+          "",
+          "",
         ],
       ];
 
@@ -344,18 +365,36 @@ export default function AnswersReviewPage() {
     const currentExamObj = exams.find((e) => e.id === selectedExamId);
     const currentSubject = currentExamObj?.subjectName || "Mata Kuliah";
 
-    const headers = ["Nama Mahasiswa", "NIM", "Mata Kuliah", "Kelas", "Waktu Mulai", "Waktu Selesai", "Status", "Jumlah Soal Dijawab", "Total Kata"];
+    const headers = [
+      "Nama Mahasiswa",
+      "NIM",
+      "Mata Kuliah",
+      "Kelas",
+      "Waktu Mulai",
+      "Waktu Selesai",
+      "Durasi Pengerjaan",
+      "Status",
+      "Jumlah Soal Dijawab",
+      "Total Kata",
+    ];
     const rows = sessions.map((s) => {
       const answeredCount = s.answers.filter((a) => a.answer && a.answer.trim().length > 0).length;
       const totalWords = s.answers.reduce((acc, a) => acc + a.wordCount, 0);
+      const isSubmitted = !!s.submittedAt;
+      const now = Date.now();
+      const startedTime = new Date(s.startedAt).getTime();
+      const durationMs = (s.exam?.durationMinutes || 90) * 60 * 1000;
+      const isTimeExpired = !isSubmitted && now > (startedTime + durationMs);
+
       return [
         `"${s.studentName}"`,
         `"${s.studentNim}"`,
         `"${currentSubject}"`,
         `"${currentClass}"`,
         `"${new Date(s.startedAt).toLocaleString("id-ID")}"`,
-        `"${s.submittedAt ? new Date(s.submittedAt).toLocaleString("id-ID") : (s.isTimeExpired ? "Waktu Habis (Auto)" : "Belum Dikumpulkan")}"`,
-        `"${s.submittedAt ? "Selesai" : (s.isTimeExpired ? "Waktu Habis (Tersimpan)" : "Sedang Berjalan")}"`,
+        `"${s.submittedAt ? new Date(s.submittedAt).toLocaleString("id-ID") : (isTimeExpired ? "Waktu Habis (Auto)" : "Belum Dikumpulkan")}"`,
+        `"${formatDuration(s.startedAt, s.submittedAt)}"`,
+        `"${s.submittedAt ? "Selesai" : (isTimeExpired ? "Waktu Habis (Tersimpan)" : "Sedang Berjalan")}"`,
         answeredCount,
         totalWords,
       ].join(",");
@@ -513,7 +552,7 @@ export default function AnswersReviewPage() {
                 <tr>
                   <th className="py-3.5 px-4">Mahasiswa</th>
                   <th className="py-3.5 px-4">NIM</th>
-                  <th className="py-3.5 px-4">Waktu Selesai</th>
+                  <th className="py-3.5 px-4">Waktu Selesai & Durasi</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-4">Total Kata</th>
                   <th className="py-3.5 px-4 text-right">Aksi</th>
@@ -537,15 +576,38 @@ export default function AnswersReviewPage() {
                         {s.studentName}
                       </td>
                       <td className="py-3.5 px-4 font-mono text-xs">{s.studentNim}</td>
-                      <td className="py-3.5 px-4 text-slate-500 text-xs">
-                        {s.submittedAt
-                          ? new Date(s.submittedAt).toLocaleTimeString("id-ID", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }) + " WIB"
-                          : isTimeExpired
-                          ? "Waktu Habis (Auto)"
-                          : "Belum dikumpulkan"}
+                      <td className="py-3.5 px-4 text-xs">
+                        {s.submittedAt ? (
+                          <div className="space-y-0.5">
+                            <div className="font-semibold text-slate-800">
+                              {new Date(s.submittedAt).toLocaleTimeString("id-ID", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}{" "}
+                              WIB
+                            </div>
+                            <div className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              <Clock className="w-3 h-3 text-emerald-600" />
+                              <span>{formatDuration(s.startedAt, s.submittedAt)}</span>
+                            </div>
+                          </div>
+                        ) : isTimeExpired ? (
+                          <div className="space-y-0.5">
+                            <div className="font-semibold text-amber-700">Waktu Habis (Auto)</div>
+                            <div className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              <span>Batas {s.exam?.durationMinutes || 90} Menit</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-0.5">
+                            <div className="text-slate-500 font-medium">Belum dikumpulkan</div>
+                            <div className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                              <Clock className="w-3 h-3 text-blue-600 animate-pulse" />
+                              <span>Berjalan {formatDuration(s.startedAt, null)}</span>
+                            </div>
+                          </div>
+                        )}
                       </td>
                       <td className="py-3.5 px-4">
                         {s.submittedAt ? (
@@ -625,10 +687,22 @@ export default function AnswersReviewPage() {
                   Lembar Jawaban: {activeSession.studentName}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  NIM: {activeSession.studentNim} &bull; Selesai:{" "}
+                  NIM: {activeSession.studentNim} &bull; Mulai:{" "}
+                  {new Date(activeSession.startedAt).toLocaleTimeString("id-ID", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}{" "}
+                  WIB &bull; Selesai:{" "}
                   {activeSession.submittedAt
-                    ? new Date(activeSession.submittedAt).toLocaleString("id-ID")
-                    : "Belum dikumpulkan"}
+                    ? new Date(activeSession.submittedAt).toLocaleTimeString("id-ID", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }) + " WIB"
+                    : "Belum dikumpulkan"}{" "}
+                  &bull; Durasi:{" "}
+                  <strong className="text-emerald-700">
+                    {formatDuration(activeSession.startedAt, activeSession.submittedAt)}
+                  </strong>
                 </p>
               </div>
 

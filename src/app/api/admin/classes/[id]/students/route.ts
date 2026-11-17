@@ -88,6 +88,23 @@ export async function GET(
 
       const examsStatusList = classData.exams.map((exam) => {
         const session = studentSessions.find((s) => s.examId === exam.id);
+        let durationText: string | null = null;
+        if (session?.startedAt && session?.submittedAt) {
+          const diffMins = Math.max(
+            1,
+            Math.round(
+              (new Date(session.submittedAt).getTime() - new Date(session.startedAt).getTime()) / 60000
+            )
+          );
+          if (diffMins < 60) {
+            durationText = `${diffMins} mnt`;
+          } else {
+            const h = Math.floor(diffMins / 60);
+            const m = diffMins % 60;
+            durationText = m > 0 ? `${h}j ${m}m` : `${h} jam`;
+          }
+        }
+
         return {
           examId: exam.id,
           examTitle: exam.title,
@@ -97,8 +114,10 @@ export async function GET(
             : session.submittedAt
             ? 'selesai'
             : 'sedang_mengerjakan',
+          startedAt: session?.startedAt || null,
           submittedAt: session?.submittedAt || null,
           sessionId: session?.id || null,
+          durationText,
         };
       });
 

@@ -47,6 +47,7 @@ interface StudentRow {
     status: "belum" | "sedang_mengerjakan" | "selesai";
     submittedAt: string | null;
     sessionId: string | null;
+    durationText?: string | null;
   }[];
 }
 
@@ -730,10 +731,19 @@ function ClassHubContent() {
       doc.setFont("helvetica", "normal");
       doc.text("Portal Evaluasi Akademik Resmi", 105, 17, { align: "center" });
 
+      let durationStr = "-";
+      if (data.startedAt) {
+        const start = new Date(data.startedAt).getTime();
+        const end = data.submittedAt ? new Date(data.submittedAt).getTime() : Date.now();
+        const diffMins = Math.max(1, Math.round((end - start) / 60000));
+        durationStr = diffMins < 60 ? `${diffMins} Menit` : `${Math.floor(diffMins / 60)} Jam ${diffMins % 60} Menit`;
+      }
+
       const meta = [
         ["Nama Mahasiswa", `: ${data.studentName}`, "Mata Kuliah", `: ${data.subjectName || classMeta?.name}`],
         ["NIM", `: ${data.studentNim}`, "Kelas", `: Kelas ${classMeta?.name}`],
-        ["Judul Penugasan", `: ${data.examTitle}`, "Tanggal Selesai", `: ${new Date().toLocaleString("id-ID")}`],
+        ["Waktu Mulai", `: ${data.startedAt ? new Date(data.startedAt).toLocaleString("id-ID") : "-"}`, "Waktu Selesai", `: ${data.submittedAt ? new Date(data.submittedAt).toLocaleString("id-ID") : "Belum submit"}`],
+        ["Durasi Pengerjaan", `: ${durationStr}`, "Judul Penugasan", `: ${data.examTitle}`],
       ];
 
       autoTable(doc, {
@@ -1118,7 +1128,7 @@ function ClassHubContent() {
                                   <div className="inline-flex items-center gap-1.5 flex-wrap">
                                     <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                                       <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                      <span>Selesai</span>
+                                      <span>Selesai{st.durationText ? ` (${st.durationText})` : ""}</span>
                                     </span>
                                     {st.sessionId && (
                                       <>
