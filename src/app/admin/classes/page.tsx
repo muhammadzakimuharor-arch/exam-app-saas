@@ -28,6 +28,8 @@ interface ExamSummary {
   subjectName: string | null;
   isActive: boolean;
   durationMinutes: number;
+  startTime?: string | null;
+  endTime?: string | null;
 }
 
 interface ClassItem {
@@ -372,26 +374,46 @@ export default function ClassesListPage() {
                         Daftar Penugasan:
                       </p>
                       <div className="space-y-1">
-                        {c.exams.slice(0, 3).map((ex) => (
-                          <div
-                            key={ex.id}
-                            className="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-slate-50/60 text-slate-700"
-                          >
-                            <span className="truncate font-medium flex-1">
-                              {ex.subjectName ? `${ex.subjectName} — ` : ""}
-                              {ex.title}
-                            </span>
-                            <span
-                              className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ml-2 ${
-                                ex.isActive
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : "bg-slate-200 text-slate-600"
-                              }`}
+                        {c.exams.slice(0, 3).map((ex) => {
+                          const now = new Date();
+                          const hasSchedule = !!(ex.startTime || ex.endTime);
+                          const isUpcoming = ex.startTime ? now < new Date(ex.startTime) : false;
+                          const isEnded = ex.endTime ? now > new Date(ex.endTime) : false;
+                          const isOngoing = hasSchedule && !isUpcoming && !isEnded;
+
+                          const badgeText = isOngoing || ex.isActive
+                            ? "Bisa Dikerjakan"
+                            : isUpcoming
+                            ? "🕒 Terjadwal"
+                            : isEnded
+                            ? "Waktu Habis"
+                            : "Tutup";
+
+                          const badgeClass = isOngoing || ex.isActive
+                            ? "bg-emerald-100 text-emerald-800"
+                            : isUpcoming
+                            ? "bg-amber-100 text-amber-800 border border-amber-200"
+                            : isEnded
+                            ? "bg-rose-100 text-rose-700"
+                            : "bg-slate-200 text-slate-600";
+
+                          return (
+                            <div
+                              key={ex.id}
+                              className="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-slate-50/60 text-slate-700"
                             >
-                              {ex.isActive ? "Bisa Dikerjakan" : "Tutup"}
-                            </span>
-                          </div>
-                        ))}
+                              <span className="truncate font-medium flex-1">
+                                {ex.subjectName ? `${ex.subjectName} — ` : ""}
+                                {ex.title}
+                              </span>
+                              <span
+                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ml-2 ${badgeClass}`}
+                              >
+                                {badgeText}
+                              </span>
+                            </div>
+                          );
+                        })}
                         {c.exams.length > 3 && (
                           <p className="text-[10px] text-slate-400 italic pl-1">
                             +{c.exams.length - 3} penugasan lainnya...

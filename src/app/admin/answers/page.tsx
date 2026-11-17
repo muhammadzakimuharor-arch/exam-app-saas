@@ -56,6 +56,10 @@ interface StudentSession {
   startedAt: string;
   submittedAt: string | null;
   ipAddress: string | null;
+  exam?: {
+    durationMinutes: number;
+    endTime?: string | null;
+  };
   answers: AnswerDetail[];
 }
 
@@ -521,6 +525,12 @@ export default function AnswersReviewPage() {
                     (acc, a) => acc + a.wordCount,
                     0
                   );
+                  const isSubmitted = !!s.submittedAt;
+                  const now = new Date().getTime();
+                  const startedTime = new Date(s.startedAt).getTime();
+                  const durationMs = (s.exam?.durationMinutes || 90) * 60 * 1000;
+                  const isTimeExpired = !isSubmitted && now > (startedTime + durationMs);
+
                   return (
                     <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-3.5 px-4 font-semibold text-slate-900">
@@ -533,6 +543,8 @@ export default function AnswersReviewPage() {
                               hour: "2-digit",
                               minute: "2-digit",
                             }) + " WIB"
+                          : isTimeExpired
+                          ? "Waktu Habis (Auto)"
                           : "Belum dikumpulkan"}
                       </td>
                       <td className="py-3.5 px-4">
@@ -541,9 +553,17 @@ export default function AnswersReviewPage() {
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             <span>Selesai</span>
                           </span>
+                        ) : isTimeExpired ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-300"
+                            title="Mahasiswa telah melewati batas durasi pengerjaan. Jawaban terakhir tersimpan aman."
+                          >
+                            <AlertCircle className="w-3 h-3 text-amber-600" />
+                            <span>Waktu Habis (Tersimpan)</span>
+                          </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                            <Clock className="w-3 h-3 text-amber-600" />
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                            <Clock className="w-3 h-3 text-blue-600 animate-pulse" />
                             <span>Sedang Berjalan</span>
                           </span>
                         )}

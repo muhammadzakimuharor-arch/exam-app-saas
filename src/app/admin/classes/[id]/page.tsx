@@ -1450,38 +1450,52 @@ function ClassHubContent() {
                                         </p>
                                       </div>
 
-                                      {/* Schedule / Manual Switch Badge */}
-                                      {hasSchedule ? (
-                                        <div className="text-right shrink-0">
-                                          {isUpcoming && (
-                                            <span className="inline-block px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
-                                              🕒 Terjadwal
-                                            </span>
-                                          )}
-                                          {isOngoing && (
-                                            <span className="inline-block px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
-                                              🟢 Sedang Aktif
-                                            </span>
-                                          )}
-                                          {isEnded && (
-                                            <span className="inline-block px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300">
-                                              🔴 Waktu Habis
-                                            </span>
-                                          )}
-                                        </div>
-                                      ) : (
+                                      {/* Interactive Status & Switch Control */}
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        {hasSchedule && (
+                                          <div className="text-right">
+                                            {isUpcoming && (
+                                              <span className="inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                                                🕒 Terjadwal
+                                              </span>
+                                            )}
+                                            {isOngoing && (
+                                              <span className="inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                                                🟢 Sedang Aktif
+                                              </span>
+                                            )}
+                                            {isEnded && (
+                                              <span className="inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-300">
+                                                🔴 Waktu Habis
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+
                                         <button
+                                          type="button"
                                           onClick={() => handleToggleExamStatus(exam)}
-                                          className={`text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors cursor-pointer shrink-0 border ${
+                                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer border ${
                                             exam.isActive
-                                              ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
-                                              : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                                              ? "bg-emerald-700 text-white border-emerald-800 hover:bg-emerald-800 shadow-emerald-950/20"
+                                              : "bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200"
                                           }`}
-                                          title="Klik untuk membuka / menutup akses pengerjaan"
+                                          title={
+                                            exam.isActive
+                                              ? "Ujian saat ini DIBUKA. Klik untuk menutup akses."
+                                              : "Ujian saat ini DITUTUP. Klik untuk membuka akses sekarang."
+                                          }
                                         >
-                                          {exam.isActive ? "BUKA (Aktif)" : "TUTUP"}
+                                          <span
+                                            className={`w-2 h-2 rounded-full ${
+                                              exam.isActive
+                                                ? "bg-emerald-300 animate-pulse"
+                                                : "bg-slate-400"
+                                            }`}
+                                          />
+                                          <span>{exam.isActive ? "Buka (Aktif)" : "Tutup"}</span>
                                         </button>
-                                      )}
+                                      </div>
                                     </div>
 
                                     {/* Schedule Details if available */}

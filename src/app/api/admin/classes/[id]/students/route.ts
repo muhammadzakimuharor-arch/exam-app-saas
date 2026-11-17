@@ -86,6 +86,22 @@ export async function GET(
         (s) => s.studentNim.toLowerCase() === student.nim.toLowerCase()
       );
 
+      const examsStatusList = classData.exams.map((exam) => {
+        const session = studentSessions.find((s) => s.examId === exam.id);
+        return {
+          examId: exam.id,
+          examTitle: exam.title,
+          subjectName: exam.subjectName || null,
+          status: !session
+            ? 'belum'
+            : session.submittedAt
+            ? 'selesai'
+            : 'sedang_mengerjakan',
+          submittedAt: session?.submittedAt || null,
+          sessionId: session?.id || null,
+        };
+      });
+
       return {
         id: student.id,
         nim: student.nim,
@@ -93,20 +109,8 @@ export async function GET(
         isAllowed: student.isAllowed !== false,
         allowExamReason: student.allowExamReason || null,
         createdAt: student.createdAt,
-        examsProgress: classData.exams.map((exam) => {
-          const session = studentSessions.find((s) => s.examId === exam.id);
-          return {
-            examId: exam.id,
-            examTitle: exam.title,
-            status: !session
-              ? 'belum'
-              : session.submittedAt
-              ? 'selesai'
-              : 'sedang_mengerjakan',
-            submittedAt: session?.submittedAt || null,
-            sessionId: session?.id || null,
-          };
-        }),
+        examsStatus: examsStatusList,
+        examsProgress: examsStatusList,
       };
     });
 

@@ -37,30 +37,33 @@ export async function POST(request: Request) {
     }
 
     const now = new Date();
-    if (exam.startTime && now < new Date(exam.startTime)) {
-      const timeStr = new Date(exam.startTime).toLocaleString('id-ID', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      });
-      return errorResponse(
-        `Ujian belum dibuka. Pelaksanaan ujian dijadwalkan pada ${timeStr} WIB.`,
-        400
-      );
-    }
+    // Jika tidak diaktifkan manual oleh dosen, terapkan batasan waktu otomatis
+    if (!exam.isActive) {
+      if (exam.startTime && now < new Date(exam.startTime)) {
+        const timeStr = new Date(exam.startTime).toLocaleString('id-ID', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        });
+        return errorResponse(
+          `Ujian belum dibuka. Pelaksanaan ujian dijadwalkan pada ${timeStr} WIB.`,
+          400
+        );
+      }
 
-    if (exam.endTime && now > new Date(exam.endTime)) {
-      const timeStr = new Date(exam.endTime).toLocaleString('id-ID', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      });
-      return errorResponse(
-        `Waktu pelaksanaan ujian telah berakhir pada ${timeStr} WIB. Pengumpulan lembar jawaban telah ditutup.`,
-        400
-      );
-    }
+      if (exam.endTime && now > new Date(exam.endTime)) {
+        const timeStr = new Date(exam.endTime).toLocaleString('id-ID', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        });
+        return errorResponse(
+          `Waktu pelaksanaan ujian telah berakhir pada ${timeStr} WIB. Pengumpulan lembar jawaban telah ditutup.`,
+          400
+        );
+      }
 
-    if (!exam.startTime && !exam.endTime && !exam.isActive) {
-      return errorResponse('Ujian ini sedang tidak aktif / ditutup oleh dosen.', 400);
+      if (!exam.startTime && !exam.endTime) {
+        return errorResponse('Ujian ini sedang tidak aktif / ditutup oleh dosen.', 400);
+      }
     }
 
     // Periksa izin ujian mahasiswa (kehadiran)

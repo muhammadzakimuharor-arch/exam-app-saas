@@ -136,7 +136,11 @@ export async function GET(request: Request) {
         let scheduleState: 'open' | 'upcoming' | 'ended' = 'open';
         let scheduleMessage: string | null = null;
 
-        if (exam.startTime && now < new Date(exam.startTime)) {
+        if (exam.isActive) {
+          // Manual Override: Dosen secara eksplisit membuka ujian
+          scheduleState = 'open';
+          scheduleMessage = null;
+        } else if (exam.startTime && now < new Date(exam.startTime)) {
           scheduleState = 'upcoming';
           const timeStr = new Date(exam.startTime).toLocaleString('id-ID', {
             dateStyle: 'medium',

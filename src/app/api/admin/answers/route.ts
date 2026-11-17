@@ -29,6 +29,12 @@ export async function GET(request: Request) {
     const sessions = await prisma.examSession.findMany({
       where: { examId },
       include: {
+        exam: {
+          select: {
+            durationMinutes: true,
+            endTime: true,
+          },
+        },
         answers: {
           include: {
             question: {

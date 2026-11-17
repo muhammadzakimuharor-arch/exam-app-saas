@@ -48,8 +48,8 @@ export async function GET(
       return errorResponse('Sesi ujian tidak ditemukan', 404);
     }
 
-    // Proteksi keamanan: Cegah pembocoran naskah soal jika ujian belum dimulai sesuai jadwal
-    if (session.exam.startTime && new Date() < new Date(session.exam.startTime) && !session.submittedAt) {
+    // Proteksi keamanan: Cegah pembocoran naskah soal jika ujian belum dimulai sesuai jadwal (kecuali jika diaktifkan manual)
+    if (!session.exam.isActive && session.exam.startTime && new Date() < new Date(session.exam.startTime) && !session.submittedAt) {
       return errorResponse('Ujian belum dibuka sesuai jadwal', 403);
     }
 
