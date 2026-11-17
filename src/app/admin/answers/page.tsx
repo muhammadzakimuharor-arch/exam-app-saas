@@ -354,8 +354,8 @@ export default function AnswersReviewPage() {
         `"${currentSubject}"`,
         `"${currentClass}"`,
         `"${new Date(s.startedAt).toLocaleString("id-ID")}"`,
-        `"${s.submittedAt ? new Date(s.submittedAt).toLocaleString("id-ID") : "Belum Submit"}"`,
-        `"${s.submittedAt ? "Selesai" : "Sedang Dikerjakan"}"`,
+        `"${s.submittedAt ? new Date(s.submittedAt).toLocaleString("id-ID") : (s.isTimeExpired ? "Waktu Habis (Auto)" : "Belum Dikumpulkan")}"`,
+        `"${s.submittedAt ? "Selesai" : (s.isTimeExpired ? "Waktu Habis (Tersimpan)" : "Sedang Berjalan")}"`,
         answeredCount,
         totalWords,
       ].join(",");
