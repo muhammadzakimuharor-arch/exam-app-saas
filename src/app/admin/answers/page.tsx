@@ -197,7 +197,22 @@ export default function AnswersReviewPage() {
       doc.text("Sistem Evaluasi Akademik Digital Terintegrasi", 105, 17, { align: "center" });
 
       // Student Meta Table
-      const durationText = formatDuration(session.startedAt, session.submittedAt);
+      const now = Date.now();
+      const startedTime = new Date(session.startedAt).getTime();
+      const durationMins = session.exam?.durationMinutes || 90;
+      const durationMs = durationMins * 60 * 1000;
+      const isTimeExpired = !session.submittedAt && now > (startedTime + durationMs);
+
+      const effectiveSubmittedAt = session.submittedAt
+        ? new Date(session.submittedAt)
+        : isTimeExpired
+        ? new Date(startedTime + durationMs)
+        : null;
+
+      const durationText = effectiveSubmittedAt
+        ? formatDuration(session.startedAt, effectiveSubmittedAt.toISOString())
+        : formatDuration(session.startedAt, null);
+
       const studentMeta = [
         ["Nama Mahasiswa", `: ${session.studentName}`, "Mata Kuliah", `: ${currentSubject}`],
         ["NIM", `: ${session.studentNim}`, "Kelas", `: Kelas ${currentClass}`],
@@ -205,13 +220,13 @@ export default function AnswersReviewPage() {
           "Waktu Mulai",
           `: ${new Date(session.startedAt).toLocaleString("id-ID")}`,
           "Waktu Selesai",
-          `: ${session.submittedAt ? new Date(session.submittedAt).toLocaleString("id-ID") : "Belum submit"}`,
+          `: ${effectiveSubmittedAt ? `${effectiveSubmittedAt.toLocaleString("id-ID")}${!session.submittedAt ? " (Waktu Habis)" : ""}` : "Belum submit"}`,
         ],
         [
           "Durasi Pengerjaan",
           `: ${durationText}`,
           "Status Pengerjaan",
-          `: ${session.submittedAt ? "SELESAI (Dikumpulkan)" : "SEDANG BERJALAN"}`,
+          `: ${session.submittedAt ? "SELESAI (Dikumpulkan)" : isTimeExpired ? "SELESAI (Waktu Habis - Tersimpan)" : "SEDANG BERJALAN"}`,
         ],
         [
           "Alamat IP",

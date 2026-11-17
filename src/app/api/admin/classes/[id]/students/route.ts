@@ -50,6 +50,7 @@ export async function GET(
             title: true,
             subjectName: true,
             isActive: true,
+            durationMinutes: true,
           },
         },
       },
@@ -79,6 +80,30 @@ export async function GET(
         startedAt: true,
       },
     });
+
+    // Otomatis finalisasi jika ada mahasiswa yang meninggalkan ujian tanpa submit dan durasinya sudah lewat
+    const nowTime = Date.now();
+    const expiredSessions = sessions.filter((s) => {
+      if (s.submittedAt) return false;
+      const examObj = classData.exams.find((e) => e.id === s.examId);
+      const durationMs = (examObj?.durationMinutes || 90) * 60 * 1000;
+      return nowTime > (new Date(s.startedAt).getTime() + durationMs);
+    });
+
+    if (expiredSessions.length > 0) {
+      await Promise.all(
+        expiredSessions.map((s) => {
+          const examObj = classData.exams.find((e) => e.id === s.examId);
+          const durationMs = (examObj?.durationMinutes || 90) * 60 * 1000;
+          const autoFinish = new Date(new Date(s.startedAt).getTime() + durationMs);
+          s.submittedAt = autoFinish;
+          return prisma.examSession.update({
+            where: { id: s.id },
+            data: { submittedAt: autoFinish },
+          });
+        })
+      );
+    }
 
     // Gabungkan status pengerjaan ke tiap mahasiswa
     const studentsWithStatus = classData.students.map((student) => {

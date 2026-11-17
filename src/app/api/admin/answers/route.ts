@@ -54,6 +54,28 @@ export async function GET(request: Request) {
       orderBy: { submittedAt: 'desc' },
     });
 
+    // Otomatis finalisasi jika ada mahasiswa yang menutup browser/laptop tanpa submit manual
+    const nowTime = Date.now();
+    const expiredToFinalize = sessions.filter((s) => {
+      if (s.submittedAt) return false;
+      const durationMs = (s.exam.durationMinutes || 90) * 60 * 1000;
+      return nowTime > (new Date(s.startedAt).getTime() + durationMs);
+    });
+
+    if (expiredToFinalize.length > 0) {
+      await Promise.all(
+        expiredToFinalize.map((s) => {
+          const durationMs = (s.exam.durationMinutes || 90) * 60 * 1000;
+          const autoFinish = new Date(new Date(s.startedAt).getTime() + durationMs);
+          s.submittedAt = autoFinish; // Sync respons JSON langsung
+          return prisma.examSession.update({
+            where: { id: s.id },
+            data: { submittedAt: autoFinish },
+          });
+        })
+      );
+    }
+
     return successResponse(sessions);
   } catch (err) {
     console.error('Error fetching answers:', err);
